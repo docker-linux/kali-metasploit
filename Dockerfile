@@ -1,8 +1,10 @@
 # Docker container with metasploit.
 #
-# Use Kali the latest Kali Linux base image
+# Use Kali Linux base image (1.0.9)
 FROM linux/kali
 MAINTAINER Tom Eklöf "tom@linux-konsult.com"
+
+ENV DEBIAN_FRONTEND noninteractive
 
 ADD ./init.sh /init.sh
 
