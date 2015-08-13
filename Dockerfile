@@ -1,6 +1,6 @@
 # Docker container with metasploit.
 #
-# Use Kali Linux base image (1.0.9)
+# Use Kali Linux base image (2.0)
 FROM linuxkonsult/kali
 MAINTAINER Tom Eklöf "tom@linux-konsult.com"
 
@@ -9,7 +9,7 @@ ENV DEBIAN_FRONTEND noninteractive
 ADD ./init.sh /init.sh
 
 # Install metasploit
-RUN apt-get -y update ; apt-get -y --force-yes install libnokogiri-ruby metasploit-framework
+RUN apt-get -y update ; apt-get -y --force-yes install ruby metasploit-framework
 
 # Attach this container to stdin when running, like this:
 # docker run -t -i linux/kali/metasploit
