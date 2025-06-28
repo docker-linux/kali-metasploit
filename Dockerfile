@@ -1,16 +1,24 @@
 # Docker container with metasploit.
 #
-# Use Kali Linux base image (2.0)
-FROM kalilinux/kali-linux-docker
-MAINTAINER Tom Eklöf "tom@linux-konsult.com"
+FROM kalilinux/kali-rolling@sha256:a018ff12a3829fccbb70c11ba68de2174add792fd474bc6dc0e2e26620d3771d
+LABEL maintainer="Tom Eklöf <tom@linux-konsult.com>" author="Tom Eklöf <tom@linux-konsult.com>"
 
 ENV DEBIAN_FRONTEND noninteractive
 
-ADD ./init.sh /init.sh
+# Install dependencies
+RUN apt-get -y update
+RUN apt-get -y --no-install-recommends install \
+    ruby \
+    metasploit-framework
+RUN rm -rf /var/lib/apt/lists/*
 
-# Install metasploit
-RUN apt-get -y update ; apt-get -y --force-yes install ruby metasploit-framework
+# Copy init and entrypoint scripts
+COPY ./init.sh /init.sh
+COPY ./entrypoint.sh /entrypoint.sh
+RUN chmod +x /init.sh /entrypoint.sh
 
-# Attach this container to stdin when running, like this:
-# docker run -t -i linux/kali/metasploit
-CMD /init.sh
+# Health check command
+HEALTHCHECK CMD /usr/share/metasploit-framework/msfconsole -h || exit 1
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/init.sh"]

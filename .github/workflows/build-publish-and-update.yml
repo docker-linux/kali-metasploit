@@ -1,0 +1,76 @@
+name: Build, Publish and Update
+
+on:
+  push:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 0 * * 0' # Every Sunday at midnight
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: linuxkonsult/kali-metasploit:latest
+
+  update-dependencies:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for Docker image updates
+        id: check_for_updates
+        run: |
+          CURRENT_VERSION=$(grep "FROM kalilinux/kali-rolling" Dockerfile | awk -F':' '{print $2}')
+          LATEST_VERSION=$(curl -s "https://hub.docker.com/v2/repositories/kalilinux/kali-rolling/tags/?page_size=1" | jq -r '.results[0].name')
+          echo "Current version: $CURRENT_VERSION"
+          echo "Latest version: $LATEST_VERSION"
+          if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+            echo "Update available"
+            echo "update_available=true" >> $GITHUB_OUTPUT
+            echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "No update available"
+            echo "update_available=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update Dockerfile and create Pull Request
+        if: steps.check_for_updates.outputs.update_available == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Update base image to kalilinux/kali-rolling:${{ steps.check_for_updates.outputs.latest_version }}"
+          branch: "update-kali-rolling-${{ steps.check_for_updates.outputs.latest_version }}"
+          delete-branch: true
+          title: "Update base image to kalilinux/kali-rolling:${{ steps.check_for_updates.outputs.latest_version }}"
+          body: |
+            An automated dependency update has been triggered.
+
+            **Image:** `kalilinux/kali-rolling`
+            **New Version:** `${{ steps.check_for_updates.outputs.latest_version }}`
+
+            This PR updates the `Dockerfile` to use the latest version of the base image. Please review and merge.
+          assignees: ${{ github.actor }}
+          reviewers: ${{ github.actor }}
+          team-reviewers:
+          labels: dependencies, automation
+          update-files: Dockerfile
